@@ -1,8 +1,51 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# VOICEADS
+
+VOICEADS helps businesses generate high-converting advertisements using real customer reviews instead of guessed marketing language.
+
+## Features
+
+- Extract insights from real Google Maps reviews
+- Generate structured JSON ad copy
+- Create marketing copy with customer language
+- Design image ad creatives
+- All content based on actual customer reviews
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+1. **Google Places API Key**
+   - Go to [Google Cloud Console](https://console.cloud.google.com/)
+   - Create a new project or select an existing one
+   - Enable the "Places API"
+   - Create credentials (API Key)
+   - Restrict the API key to Places API for security
+
+2. **OpenAI API Key**
+   - Go to [OpenAI Platform](https://platform.openai.com/)
+   - Sign up or log in
+   - Navigate to API Keys section
+   - Create a new API key
+
+### Setup
+
+1. Copy `.env.example` to `.env.local`:
+   ```bash
+   cp .env.example .env.local
+   ```
+
+2. Add your API keys to `.env.local`:
+   ```
+   GOOGLE_PLACES_API_KEY=your_google_places_api_key_here
+   OPENAI_API_KEY=your_openai_api_key_here
+   ```
+
+3. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+4. Run the development server:
 
 ```bash
 npm run dev

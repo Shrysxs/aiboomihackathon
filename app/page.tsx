@@ -1,65 +1,95 @@
-import Image from "next/image";
+import Link from "next/link";
 
 export default function Home() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <div className="min-h-screen bg-white">
+      {/* Hero Section */}
+      <section className="px-6 py-20 md:py-32 max-w-6xl mx-auto text-center">
+        <h1 className="text-6xl md:text-7xl font-bold mb-6 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+          VOICEADS
+        </h1>
+        <h2 className="text-3xl md:text-5xl font-semibold mb-6 text-gray-900">
+          Ads written by your customers, not your brand.
+        </h2>
+        <p className="text-xl md:text-2xl text-gray-600 mb-10 max-w-3xl mx-auto">
+          Turn real customer reviews into high-trust ads, images, and marketing copy.
+        </p>
+        <Link
+          href="/questionnaire"
+          className="inline-block bg-blue-600 text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-blue-700 transition-colors"
+        >
+          Generate Ads from Reviews
+        </Link>
+      </section>
+
+      {/* Problem Section */}
+      <section className="px-6 py-20 bg-gray-50">
+        <div className="max-w-4xl mx-auto">
+          <h2 className="text-4xl font-bold mb-8 text-gray-900">The Problem</h2>
+          <div className="text-lg text-gray-700 space-y-4 leading-relaxed">
+            <p>
+              Local businesses, restaurants, service providers, and D2C brands receive
+              hundreds of customer reviews across platforms like Google Maps and social media.
+              Despite this, most advertising still relies on guessed messaging.
+            </p>
+            <p>
+              Businesses do not fail because of lack of platforms or resources,
+              but because they struggle to identify messaging that truly resonates.
+              As a result, advertisements often feel generic, disconnected, and untrustworthy.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Solution Section */}
+      <section className="px-6 py-20">
+        <div className="max-w-4xl mx-auto">
+          <h2 className="text-4xl font-bold mb-8 text-gray-900">The Solution</h2>
+          <p className="text-lg text-gray-700 leading-relaxed">
+            VOICEADS analyzes real customer reviews to identify recurring language,
+            emotional signals, and trust-building phrases.
+            It then converts these insights into advertising content written in
+            the customer's own words — the most credible form of marketing.
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </section>
+
+      {/* How It Works Section */}
+      <section className="px-6 py-20 bg-gray-50">
+        <div className="max-w-6xl mx-auto">
+          <h2 className="text-4xl font-bold mb-16 text-center text-gray-900">How It Works</h2>
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+            <div className="bg-white p-6 rounded-lg shadow-sm">
+              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                <span className="text-blue-600 font-bold text-xl">1</span>
+              </div>
+              <h3 className="text-xl font-semibold mb-2 text-gray-900">Add your business details</h3>
+              <p className="text-gray-600">Quick questionnaire to understand your business context</p>
+            </div>
+            <div className="bg-white p-6 rounded-lg shadow-sm">
+              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                <span className="text-blue-600 font-bold text-xl">2</span>
+              </div>
+              <h3 className="text-xl font-semibold mb-2 text-gray-900">Connect your Google Maps reviews</h3>
+              <p className="text-gray-600">We fetch real customer reviews automatically</p>
+            </div>
+            <div className="bg-white p-6 rounded-lg shadow-sm">
+              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                <span className="text-blue-600 font-bold text-xl">3</span>
+              </div>
+              <h3 className="text-xl font-semibold mb-2 text-gray-900">Choose your output format</h3>
+              <p className="text-gray-600">Select JSON, images, or marketing copy</p>
+            </div>
+            <div className="bg-white p-6 rounded-lg shadow-sm">
+              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                <span className="text-blue-600 font-bold text-xl">4</span>
+              </div>
+              <h3 className="text-xl font-semibold mb-2 text-gray-900">Get ads powered by real customer proof</h3>
+              <p className="text-gray-600">Receive authentic, high-converting ad content</p>
+            </div>
+          </div>
         </div>
-      </main>
+      </section>
     </div>
   );
 }
