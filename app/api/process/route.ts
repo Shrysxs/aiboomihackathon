@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 
+// Note: For Hugging Face image generation, we'll use a text-to-image model
+// Qwen/Qwen-Image-2512 may not be available, so we'll use a compatible alternative
+
 // In-memory storage for demo purposes (stateless backend constraint)
 // In production, this would be replaced with proper state management
 const processQueue: Map<string, any> = new Map();
@@ -23,11 +26,18 @@ export async function POST(request: Request) {
     await processJob(jobId, formData);
 
     const result = processQueue.get(jobId);
-    return NextResponse.json(result || { id: jobId, status: "processing" });
+    // Ensure id is always included in response
+    return NextResponse.json({ 
+      id: jobId,
+      ...result 
+    });
   } catch (error) {
     console.error("Error processing questionnaire:", error);
     return NextResponse.json(
-      { error: "Failed to process questionnaire" },
+      { 
+        error: "Failed to process questionnaire",
+        message: error instanceof Error ? error.message : "Unknown error"
+      },
       { status: 500 }
     );
   }
@@ -47,11 +57,17 @@ async function processJob(jobId: string, formData: any) {
       throw new Error("At least 3 reviews are required");
     }
 
-    // Step 3: AI Call #1 - Insight Extraction using OpenAI
+    // Step 3: AI Call #1 - Insight Extraction using Groq
     const insights = await extractInsights(reviews);
 
-    // Step 4: AI Call #2 - Content Generation using OpenAI
+    // Step 4: AI Call #2 - Content Generation using Groq
     const outputs = await generateContent(formData, insights);
+
+    // Step 5: Generate advertisement image using Hugging Face
+    if (outputs.imageAd) {
+      const imageUrl = await generateAdImage(formData, insights, outputs.imageAd);
+      outputs.imageAd.imageUrl = imageUrl;
+    }
 
     // Store results
     processQueue.set(jobId, {
@@ -81,9 +97,9 @@ function preprocessReviews(reviewsText: string): string[] {
 }
 
 async function extractInsights(reviews: string[]): Promise<any> {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
-    throw new Error("OPENAI_API_KEY environment variable is not set");
+    throw new Error("GROQ_API_KEY environment variable is not set");
   }
 
   const reviewText = reviews.join("\n\n");
@@ -111,14 +127,14 @@ Focus on:
 
 Return ONLY the JSON object, no other text.`;
 
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: "gpt-4o-mini",
+      model: "llama-3.1-8b-instant",
       messages: [
         {
           role: "system",
@@ -136,14 +152,14 @@ Return ONLY the JSON object, no other text.`;
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    throw new Error(`OpenAI API error: ${errorData.error?.message || response.statusText}`);
+    throw new Error(`Groq API error: ${errorData.error?.message || response.statusText}`);
   }
 
   const data = await response.json();
   const content = data.choices[0]?.message?.content;
 
   if (!content) {
-    throw new Error("No content returned from OpenAI");
+    throw new Error("No content returned from Groq");
   }
 
   try {
@@ -162,9 +178,9 @@ Return ONLY the JSON object, no other text.`;
 }
 
 async function generateContent(formData: any, insights: any): Promise<any> {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
-    throw new Error("OPENAI_API_KEY environment variable is not set");
+    throw new Error("GROQ_API_KEY environment variable is not set");
   }
 
   const businessName = formData.businessName;
@@ -188,14 +204,17 @@ Review Insights:
 - Key Benefits: ${insights.keyBenefits?.join(", ") || "N/A"}
 - Trust Signals: ${insights.trustSignals?.join(", ") || "N/A"}
 - Important Keywords: ${insights.importantKeywords?.join(", ") || "N/A"}
+- Customer Emotions: ${insights.customerEmotions?.join(", ") || "N/A"}
 - Review Count: ${insights.reviewCount}
 
 CRITICAL RULES:
 1. Use ONLY language and claims that are supported by the review insights
-2. Do NOT invent benefits or claims not mentioned in reviews
+2. Do NOT invent benefits, claims, numbers, awards, or guarantees not mentioned in reviews
 3. Use customer language from trust signals and benefits
 4. Match the brand tone: ${tone}
 5. Make it suitable for: ${platforms}
+6. Avoid generic marketing clichés
+7. Output must feel suitable for large hotels, agencies, or enterprise clients
 
 Generate THREE outputs as a JSON object with this exact structure:
 {
@@ -209,7 +228,20 @@ Generate THREE outputs as a JSON object with this exact structure:
       "benefit2": ${Math.floor(insights.reviewCount * 0.8)}
     }
   },
-  "marketingCopy": "Complete marketing copy (2-3 paragraphs) with hook, value proposition, social proof, and CTA",
+  "marketingCopy": {
+    "campaign_summary": {
+      "campaign_objective": "Clear objective based on marketing goals",
+      "target_audience": "${formData.targetAudience.join(", ")}",
+      "key_emotion": "Primary emotion from customer reviews",
+      "proof_source": "customer reviews"
+    },
+    "headlines": ["3-5 short headline variations that are trust-driven and premium in tone"],
+    "subheadline": "One concise line explaining the promise, not salesy or exaggerated",
+    "core_copy": "Professional, calm, confident hero paragraph suitable for website, landing pages, and long-form ads. No hype, no emojis, no exaggeration. Premium brand copy tone.",
+    "value_points": ["4-6 experience-focused bullet points derived ONLY from customer insights, not feature-heavy"],
+    "social_proof": "Paraphrase customer sentiments naturally using phrases like 'Guests consistently mention...' or 'Customers often highlight...'. Do NOT fabricate statistics. Base only on review insights.",
+    "ctas": ["3-5 short, professional CTAs suitable for booking or conversion"]
+  },
   "imageAd": {
     "headline": "Short headline for image ad (max 8 words)",
     "subheadline": "Supporting subheadline (max 12 words)",
@@ -220,14 +252,14 @@ Generate THREE outputs as a JSON object with this exact structure:
 
 Return ONLY valid JSON, no markdown formatting or code blocks.`;
 
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: "gpt-4o-mini",
+      model: "llama-3.1-8b-instant",
       messages: [
         {
           role: "system",
@@ -245,14 +277,14 @@ Return ONLY valid JSON, no markdown formatting or code blocks.`;
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    throw new Error(`OpenAI API error: ${errorData.error?.message || response.statusText}`);
+    throw new Error(`Groq API error: ${errorData.error?.message || response.statusText}`);
   }
 
   const data = await response.json();
   const content = data.choices[0]?.message?.content;
 
   if (!content) {
-    throw new Error("No content returned from OpenAI");
+    throw new Error("No content returned from Groq");
   }
 
   try {
@@ -272,6 +304,131 @@ Return ONLY valid JSON, no markdown formatting or code blocks.`;
   } catch (parseError) {
     console.error("Failed to parse content JSON:", content);
     throw new Error("Failed to parse AI response as JSON");
+  }
+}
+
+// Brand tone to mood mapping
+function getMoodFromBrandTone(tone: string): string {
+  const toneLower = tone.toLowerCase();
+  if (toneLower.includes("professional")) return "calm, confident";
+  if (toneLower.includes("friendly")) return "warm, welcoming";
+  if (toneLower.includes("bold")) return "energetic, modern";
+  if (toneLower.includes("premium")) return "elegant, refined";
+  return "calm, confident"; // default
+}
+
+async function generateAdImage(formData: any, insights: any, imageAdData: any): Promise<string> {
+  const hfApiKey = process.env.HUGGINGFACE_API_KEY;
+  if (!hfApiKey) {
+    throw new Error("HUGGINGFACE_API_KEY environment variable is not set");
+  }
+
+  // Extract variables for prompt
+  const businessType = formData.businessType[0] || "business";
+  const industry = formData.businessType.join(", ") || "general";
+  const brandTone = formData.brandTone.join(", ") || "Professional";
+  const targetPlatform = formData.advertisingPlatform[0] || "general";
+  const targetAudience = formData.targetAudience.join(", ") || "general";
+  const keyCustomerPhrase = insights.trustSignals?.[0] || insights.keyBenefits?.[0] || "quality service";
+  const mood = getMoodFromBrandTone(brandTone);
+
+  // System prompt (static) - embedded in user prompt for Hugging Face
+  const systemPrompt = "You are a professional commercial advertising art director. Your task is to generate realistic, high-quality advertisement visuals suitable for real-world marketing campaigns. Avoid artistic, abstract, fantasy, or surreal styles. Prioritize realism, clarity, premium composition, and brand safety.";
+
+  // User prompt (dynamic) - formatted for image generation
+  const imagePrompt = `Create a premium advertisement image for a ${businessType} in the ${industry} industry.
+
+Ad Context:
+- Brand tone: ${brandTone}
+- Target platform: ${targetPlatform}
+- Target audience: ${targetAudience}
+
+Core customer message (must inspire the visual):
+"${keyCustomerPhrase}"
+
+Visual Direction:
+- Style: clean, modern, realistic commercial photography
+- Mood: ${mood}
+- Lighting: natural, professional, soft
+- Composition: minimal, uncluttered, experience-focused
+- Environment: relevant to the business context
+- Color palette: premium, neutral, brand-safe
+
+Text Handling:
+- Do NOT include large blocks of text
+- If text appears, limit to a short headline-style phrase
+- Text must feel naturally integrated into the scene
+
+Constraints:
+- No logos unless generic
+- No watermarks
+- No exaggerated expressions
+- No unrealistic props or scenery
+
+Output Requirements:
+- Square aspect ratio (1:1)
+- High-resolution
+- Advertisement-ready visual`;
+
+  try {
+    // Use Hugging Face Inference API for Qwen/Qwen-Image-2512
+    // If model is not available, fallback to compatible text-to-image model
+    const modelName = "Qwen/Qwen-Image-2512"; // Primary model as specified
+    
+    const response = await fetch(
+      `https://api-inference.huggingface.co/models/${modelName}`,
+      {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${hfApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          inputs: imagePrompt,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      // Try alternative model if primary fails
+      const errorData = await response.json().catch(() => ({}));
+      console.warn("Primary model failed, trying alternative:", errorData);
+      
+      // Try with Stable Diffusion as fallback
+      const altResponse = await fetch(
+        "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0",
+        {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${hfApiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            inputs: imagePrompt,
+          }),
+        }
+      );
+
+      if (!altResponse.ok) {
+        const altError = await altResponse.json().catch(() => ({}));
+        throw new Error(`Hugging Face API error: ${altError.error || altResponse.statusText}`);
+      }
+
+      const imageBlob = await altResponse.blob();
+      // Convert blob to base64 data URL for display
+      const arrayBuffer = await imageBlob.arrayBuffer();
+      const base64 = Buffer.from(arrayBuffer).toString("base64");
+      return `data:image/png;base64,${base64}`;
+    }
+
+    const imageBlob = await response.blob();
+    // Convert blob to base64 data URL for display
+    const arrayBuffer = await imageBlob.arrayBuffer();
+    const base64 = Buffer.from(arrayBuffer).toString("base64");
+    return `data:image/png;base64,${base64}`;
+  } catch (error) {
+    console.error("Error generating image:", error);
+    throw new Error(`Failed to generate image: ${error instanceof Error ? error.message : "Unknown error"}`);
   }
 }
 

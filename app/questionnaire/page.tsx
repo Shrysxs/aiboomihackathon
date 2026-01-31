@@ -60,14 +60,21 @@ export default function Questionnaire() {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to process questionnaire");
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || errorData.error || "Failed to process questionnaire");
       }
 
       const result = await response.json();
+      
+      if (!result.id) {
+        throw new Error("No job ID returned from server");
+      }
+      
       router.push(`/results?id=${result.id}`);
     } catch (error) {
       console.error("Error:", error);
-      alert("Something went wrong. Please try again.");
+      const errorMessage = error instanceof Error ? error.message : "Something went wrong. Please try again.";
+      alert(errorMessage);
     }
   };
 

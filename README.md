@@ -14,8 +14,8 @@ VOICEADS helps businesses generate high-converting advertisements using real cus
 
 ### Prerequisites
 
-**OpenAI API Key**
-- Go to [OpenAI Platform](https://platform.openai.com/)
+**Groq API Key**
+- Go to [Groq Console](https://console.groq.com/)
 - Sign up or log in
 - Navigate to API Keys section
 - Create a new API key
@@ -27,9 +27,9 @@ VOICEADS helps businesses generate high-converting advertisements using real cus
    cp .env.example .env.local
    ```
 
-2. Add your OpenAI API key to `.env.local`:
+2. Add your Groq API key to `.env.local`:
    ```
-   OPENAI_API_KEY=your_openai_api_key_here
+   GROQ_API_KEY=your_groq_api_key_here
    ```
 
 3. Install dependencies:

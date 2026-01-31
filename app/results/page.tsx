@@ -1,4 +1,4 @@
-"use client";
+ "use client";
 
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
@@ -6,7 +6,15 @@ import Link from "next/link";
 
 interface Outputs {
   json: any;
-  marketingCopy: string;
+  marketingCopy: string | {
+    campaign_summary?: any;
+    headlines?: string[];
+    subheadline?: string;
+    core_copy?: string;
+    value_points?: string[];
+    social_proof?: string;
+    ctas?: string[];
+  };
   imageAd: any;
 }
 
@@ -151,28 +159,120 @@ function ResultsContent() {
             {activeTab === "image" && (
               <div>
                 <h2 className="text-2xl font-bold mb-4 text-gray-900">Image Ad Creative</h2>
-                <div className="bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg p-12 text-white text-center max-w-md mx-auto">
-                  <h3 className="text-3xl font-bold mb-4">{imageAd.headline}</h3>
-                  <p className="text-xl mb-8 opacity-90">{imageAd.subheadline}</p>
-                  <button className="bg-white text-blue-600 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors">
-                    {imageAd.cta}
-                  </button>
-                </div>
-                <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-                  <p className="text-sm text-gray-600">
-                    <strong>Design Notes:</strong> {imageAd.designStyle}, suitable for social media ads
-                  </p>
-                </div>
+                {imageAd.imageUrl ? (
+                  <div className="space-y-4">
+                    <div className="bg-white border border-gray-200 rounded-lg p-4">
+                      <img 
+                        src={imageAd.imageUrl} 
+                        alt="Generated advertisement" 
+                        className="w-full max-w-md mx-auto rounded-lg shadow-sm"
+                      />
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <p className="text-sm text-gray-600 mb-2">
+                        <strong>Headline:</strong> {imageAd.headline}
+                      </p>
+                      <p className="text-sm text-gray-600 mb-2">
+                        <strong>Subheadline:</strong> {imageAd.subheadline}
+                      </p>
+                      <p className="text-sm text-gray-600 mb-2">
+                        <strong>CTA:</strong> {imageAd.cta}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        <strong>Design Style:</strong> {imageAd.designStyle}, suitable for social media ads
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg p-12 text-white text-center max-w-md mx-auto">
+                      <h3 className="text-3xl font-bold mb-4">{imageAd.headline}</h3>
+                      <p className="text-xl mb-8 opacity-90">{imageAd.subheadline}</p>
+                      <button className="bg-white text-blue-600 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors">
+                        {imageAd.cta}
+                      </button>
+                    </div>
+                    <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+                      <p className="text-sm text-gray-600">
+                        <strong>Design Notes:</strong> {imageAd.designStyle}, suitable for social media ads
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
             {activeTab === "copy" && (
               <div>
                 <h2 className="text-2xl font-bold mb-4 text-gray-900">Marketing Copy</h2>
-                <div className="bg-white border border-gray-200 rounded-lg p-8">
-                  <pre className="whitespace-pre-wrap text-gray-700 leading-relaxed font-sans">
-                    {marketingCopy}
-                  </pre>
+                <div className="bg-white border border-gray-200 rounded-lg p-8 space-y-6">
+                  {typeof marketingCopy === "string" ? (
+                    <pre className="whitespace-pre-wrap text-gray-700 leading-relaxed font-sans">
+                      {marketingCopy}
+                    </pre>
+                  ) : (
+                    <>
+                      {marketingCopy.campaign_summary && (
+                        <div className="border-b border-gray-200 pb-4">
+                          <h3 className="text-lg font-semibold mb-3 text-gray-900">Campaign Summary</h3>
+                          <div className="grid md:grid-cols-2 gap-3 text-sm">
+                            <div><strong>Objective:</strong> {marketingCopy.campaign_summary.campaign_objective}</div>
+                            <div><strong>Target Audience:</strong> {marketingCopy.campaign_summary.target_audience}</div>
+                            <div><strong>Key Emotion:</strong> {marketingCopy.campaign_summary.key_emotion}</div>
+                            <div><strong>Proof Source:</strong> {marketingCopy.campaign_summary.proof_source}</div>
+                          </div>
+                        </div>
+                      )}
+                      {marketingCopy.headlines && marketingCopy.headlines.length > 0 && (
+                        <div>
+                          <h3 className="text-lg font-semibold mb-3 text-gray-900">Primary Headline Options</h3>
+                          <ul className="list-disc list-inside space-y-2 text-gray-700">
+                            {marketingCopy.headlines.map((headline, i) => (
+                              <li key={i}>{headline}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {marketingCopy.subheadline && (
+                        <div>
+                          <h3 className="text-lg font-semibold mb-2 text-gray-900">Supporting Sub-headline</h3>
+                          <p className="text-gray-700">{marketingCopy.subheadline}</p>
+                        </div>
+                      )}
+                      {marketingCopy.core_copy && (
+                        <div>
+                          <h3 className="text-lg font-semibold mb-2 text-gray-900">Core Marketing Copy</h3>
+                          <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">{marketingCopy.core_copy}</p>
+                        </div>
+                      )}
+                      {marketingCopy.value_points && marketingCopy.value_points.length > 0 && (
+                        <div>
+                          <h3 className="text-lg font-semibold mb-3 text-gray-900">Value Proposition</h3>
+                          <ul className="list-disc list-inside space-y-2 text-gray-700">
+                            {marketingCopy.value_points.map((point, i) => (
+                              <li key={i}>{point}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {marketingCopy.social_proof && (
+                        <div>
+                          <h3 className="text-lg font-semibold mb-2 text-gray-900">Social Proof Language</h3>
+                          <p className="text-gray-700 leading-relaxed">{marketingCopy.social_proof}</p>
+                        </div>
+                      )}
+                      {marketingCopy.ctas && marketingCopy.ctas.length > 0 && (
+                        <div>
+                          <h3 className="text-lg font-semibold mb-3 text-gray-900">Call-to-Action Variations</h3>
+                          <ul className="list-disc list-inside space-y-2 text-gray-700">
+                            {marketingCopy.ctas.map((cta, i) => (
+                              <li key={i}>{cta}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
             )}
