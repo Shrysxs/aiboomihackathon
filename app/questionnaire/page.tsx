@@ -12,7 +12,7 @@ export default function Questionnaire() {
     targetAudience: [] as string[],
     advertisingPlatform: [] as string[],
     brandTone: [] as string[],
-    googleMapsLink: "",
+    reviews: "",
     preferredCTA: [] as string[],
   });
 
@@ -30,8 +30,13 @@ export default function Questionnaire() {
     e.preventDefault();
     
     // Validate required fields
-    if (!formData.businessName || !formData.googleMapsLink) {
-      alert("Please fill in Business Name and Google Maps Business Link");
+    if (!formData.businessName || !formData.reviews.trim()) {
+      alert("Please fill in Business Name and Customer Reviews");
+      return;
+    }
+
+    if (formData.reviews.trim().split("\n").filter(r => r.trim().length > 0).length < 3) {
+      alert("Please provide at least 3 customer reviews");
       return;
     }
 
@@ -188,21 +193,20 @@ export default function Questionnaire() {
             </div>
           </div>
 
-          {/* Google Maps Business Link */}
+          {/* Customer Reviews */}
           <div>
             <label className="block text-sm font-semibold mb-2 text-gray-900">
-              7. Google Maps Business Link
+              7. Customer Reviews
             </label>
-            <input
-              type="url"
-              value={formData.googleMapsLink}
-              onChange={(e) => setFormData({ ...formData, googleMapsLink: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="https://maps.google.com/..."
+            <textarea
+              value={formData.reviews}
+              onChange={(e) => setFormData({ ...formData, reviews: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent min-h-[200px]"
+              placeholder="Paste your customer reviews here, one per line:&#10;&#10;Amazing service! The team was professional...&#10;Best experience I've had. Highly recommend...&#10;Fast, reliable, and affordable..."
               required
             />
             <p className="text-sm text-gray-500 mt-1">
-              Used to fetch real customer reviews via Google Places API
+              Paste customer reviews (one per line). Minimum 3 reviews required.
             </p>
           </div>
 

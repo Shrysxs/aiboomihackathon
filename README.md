@@ -14,18 +14,11 @@ VOICEADS helps businesses generate high-converting advertisements using real cus
 
 ### Prerequisites
 
-1. **Google Places API Key**
-   - Go to [Google Cloud Console](https://console.cloud.google.com/)
-   - Create a new project or select an existing one
-   - Enable the "Places API"
-   - Create credentials (API Key)
-   - Restrict the API key to Places API for security
-
-2. **OpenAI API Key**
-   - Go to [OpenAI Platform](https://platform.openai.com/)
-   - Sign up or log in
-   - Navigate to API Keys section
-   - Create a new API key
+**OpenAI API Key**
+- Go to [OpenAI Platform](https://platform.openai.com/)
+- Sign up or log in
+- Navigate to API Keys section
+- Create a new API key
 
 ### Setup
 
@@ -34,9 +27,8 @@ VOICEADS helps businesses generate high-converting advertisements using real cus
    cp .env.example .env.local
    ```
 
-2. Add your API keys to `.env.local`:
+2. Add your OpenAI API key to `.env.local`:
    ```
-   GOOGLE_PLACES_API_KEY=your_google_places_api_key_here
    OPENAI_API_KEY=your_openai_api_key_here
    ```
 

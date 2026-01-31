@@ -70,8 +70,8 @@ export default function Home() {
               <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-4">
                 <span className="text-blue-600 font-bold text-xl">2</span>
               </div>
-              <h3 className="text-xl font-semibold mb-2 text-gray-900">Connect your Google Maps reviews</h3>
-              <p className="text-gray-600">We fetch real customer reviews automatically</p>
+              <h3 className="text-xl font-semibold mb-2 text-gray-900">Paste your customer reviews</h3>
+              <p className="text-gray-600">Provide your customer reviews as text</p>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-sm">
               <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-4">

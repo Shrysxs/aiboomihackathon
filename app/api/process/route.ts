@@ -18,7 +18,7 @@ export async function POST(request: Request) {
       createdAt: Date.now(),
     });
 
-    // Process immediately (for demo with mock data)
+    // Process immediately
     // In production, this would be async with proper queue system
     await processJob(jobId, formData);
 
@@ -35,22 +35,22 @@ export async function POST(request: Request) {
 
 async function processJob(jobId: string, formData: any) {
   try {
-    // Step 1: Extract place ID from Google Maps URL
-    const placeId = extractPlaceId(formData.googleMapsLink);
-    if (!placeId) {
-      throw new Error("Invalid Google Maps URL. Please provide a valid Google Maps business link.");
+    // Step 1: Parse reviews from text input
+    if (!formData.reviews || !formData.reviews.trim()) {
+      throw new Error("No reviews provided");
     }
 
-    // Step 2: Fetch reviews using Google Places API
-    const reviews = await fetchReviews(placeId);
+    // Step 2: Pre-process reviews (split by newlines, clean, deduplicate)
+    const reviews = preprocessReviews(formData.reviews);
 
-    // Step 3: Pre-process reviews
-    const cleanReviews = preprocessReviews(reviews);
+    if (reviews.length < 3) {
+      throw new Error("At least 3 reviews are required");
+    }
 
-    // Step 4: AI Call #1 - Insight Extraction using OpenAI
-    const insights = await extractInsights(cleanReviews);
+    // Step 3: AI Call #1 - Insight Extraction using OpenAI
+    const insights = await extractInsights(reviews);
 
-    // Step 5: AI Call #2 - Content Generation using OpenAI
+    // Step 4: AI Call #2 - Content Generation using OpenAI
     const outputs = await generateContent(formData, insights);
 
     // Store results
@@ -71,107 +71,10 @@ async function processJob(jobId: string, formData: any) {
   }
 }
 
-function extractPlaceId(url: string): string | null {
-  // Extract place ID from various Google Maps URL formats
-  // Format 1: https://www.google.com/maps/place/?q=place_id:ChIJ...
-  const placeIdMatch = url.match(/place_id=([^&]+)/);
-  if (placeIdMatch) return placeIdMatch[1];
-  
-  // Format 2: https://maps.google.com/?cid=123456789
-  const cidMatch = url.match(/[?&]cid=([^&]+)/);
-  if (cidMatch) {
-    // CID needs to be converted to place_id via API, but we can try direct lookup
-    // For now, return the CID and handle conversion in fetchReviews
-    return cidMatch[1];
-  }
-  
-  // Format 3: Extract from place name URL (requires text search)
-  // https://www.google.com/maps/place/PlaceName/@lat,lng
-  const placeMatch = url.match(/\/place\/([^\/@]+)/);
-  if (placeMatch) {
-    // This requires text search to get place_id
-    return placeMatch[1];
-  }
-  
-  // Format 4: Direct place_id in URL
-  const directMatch = url.match(/\/place_id\/([^\/\?]+)/);
-  if (directMatch) return directMatch[1];
-  
-  return null;
-}
-
-async function fetchReviews(placeIdOrQuery: string): Promise<string[]> {
-  const apiKey = process.env.GOOGLE_PLACES_API_KEY;
-  if (!apiKey) {
-    throw new Error("GOOGLE_PLACES_API_KEY environment variable is not set");
-  }
-
-  let placeId = placeIdOrQuery;
-
-  // Check if it's a valid place_id format (starts with ChIJ or is a valid place_id)
-  const isValidPlaceId = placeIdOrQuery.startsWith("ChIJ") || 
-                         placeIdOrQuery.match(/^[A-Za-z0-9_-]{27,}$/);
-
-  if (!isValidPlaceId) {
-    // If it's a CID or place name, use text search to find place_id
-    // For CID, we can search using the CID directly
-    const searchQuery = placeIdOrQuery;
-    const textSearchUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(searchQuery)}&key=${apiKey}`;
-    
-    try {
-      const searchResponse = await fetch(textSearchUrl);
-      const searchData = await searchResponse.json();
-      
-      if (searchData.status === "OK" && searchData.results && searchData.results.length > 0) {
-        placeId = searchData.results[0].place_id;
-      } else {
-        throw new Error(`Could not find place: ${searchData.error_message || searchData.status}`);
-      }
-    } catch (error) {
-      throw new Error(`Failed to search for place: ${error instanceof Error ? error.message : "Unknown error"}`);
-    }
-  }
-
-  // Fetch place details with reviews
-  const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(placeId)}&fields=reviews,rating,user_ratings_total,name&key=${apiKey}`;
-  
-  let response;
-  let data;
-  
-  try {
-    response = await fetch(detailsUrl);
-    data = await response.json();
-  } catch (error) {
-    throw new Error(`Failed to fetch place details: ${error instanceof Error ? error.message : "Unknown error"}`);
-  }
-
-  if (data.status !== "OK") {
-    throw new Error(`Google Places API error: ${data.error_message || data.status}`);
-  }
-
-  if (!data.result) {
-    throw new Error("Place not found");
-  }
-
-  if (!data.result.reviews || data.result.reviews.length === 0) {
-    throw new Error("No reviews found for this place");
-  }
-
-  // Extract review text, limit to 30-50 reviews as specified
-  const reviews = data.result.reviews
-    .slice(0, 50)
-    .map((review: any) => review.text)
-    .filter((text: string) => text && text.trim().length > 0);
-
-  if (reviews.length === 0) {
-    throw new Error("No valid reviews found");
-  }
-
-  return reviews;
-}
-
-function preprocessReviews(reviews: string[]): string[] {
-  return reviews
+function preprocessReviews(reviewsText: string): string[] {
+  // Split by newlines and process each review
+  return reviewsText
+    .split("\n")
     .map((review) => review.trim())
     .filter((review) => review.length > 0)
     .filter((review, index, self) => self.indexOf(review) === index); // Remove duplicates
