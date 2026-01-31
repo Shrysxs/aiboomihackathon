@@ -45,25 +45,29 @@ export async function POST(request: Request) {
 
 async function processJob(jobId: string, formData: any) {
   try {
-    // Step 1: Parse reviews from text input
-    if (!formData.reviews || !formData.reviews.trim()) {
-      throw new Error("No reviews provided");
+    // Step 1: Extract place ID from Google Maps URL
+    const placeId = extractPlaceId(formData.googleMapsLink);
+    if (!placeId) {
+      throw new Error("Invalid Google Maps URL. Please provide a valid Google Maps business link.");
     }
 
-    // Step 2: Pre-process reviews (split by newlines, clean, deduplicate)
-    const reviews = preprocessReviews(formData.reviews);
+    // Step 2: Fetch reviews using Google Places API
+    const reviews = await fetchReviews(placeId);
 
-    if (reviews.length < 3) {
+    // Step 3: Pre-process reviews
+    const cleanReviews = preprocessReviews(reviews);
+
+    if (cleanReviews.length < 3) {
       throw new Error("At least 3 reviews are required");
     }
 
-    // Step 3: AI Call #1 - Insight Extraction using Groq
-    const insights = await extractInsights(reviews);
+    // Step 4: AI Call #1 - Insight Extraction using Groq
+    const insights = await extractInsights(cleanReviews);
 
-    // Step 4: AI Call #2 - Content Generation using Groq
+    // Step 5: AI Call #2 - Content Generation using Groq
     const outputs = await generateContent(formData, insights);
 
-    // Step 5: Generate advertisement image using Hugging Face
+    // Step 6: Generate advertisement image using Hugging Face
     if (outputs.imageAd) {
       const imageUrl = await generateAdImage(formData, insights, outputs.imageAd);
       outputs.imageAd.imageUrl = imageUrl;
@@ -87,10 +91,105 @@ async function processJob(jobId: string, formData: any) {
   }
 }
 
-function preprocessReviews(reviewsText: string): string[] {
-  // Split by newlines and process each review
-  return reviewsText
-    .split("\n")
+function extractPlaceId(url: string): string | null {
+  // Extract place ID from various Google Maps URL formats
+  // Format 1: https://www.google.com/maps/place/?q=place_id:ChIJ...
+  const placeIdMatch = url.match(/place_id=([^&]+)/);
+  if (placeIdMatch) return placeIdMatch[1];
+  
+  // Format 2: https://maps.google.com/?cid=123456789
+  const cidMatch = url.match(/[?&]cid=([^&]+)/);
+  if (cidMatch) {
+    // CID needs to be converted to place_id via API
+    return cidMatch[1];
+  }
+  
+  // Format 3: Extract from place name URL (requires text search)
+  // https://www.google.com/maps/place/PlaceName/@lat,lng
+  const placeMatch = url.match(/\/place\/([^\/@]+)/);
+  if (placeMatch) {
+    // This requires text search to get place_id
+    return placeMatch[1];
+  }
+  
+  // Format 4: Direct place_id in URL
+  const directMatch = url.match(/\/place_id\/([^\/\?]+)/);
+  if (directMatch) return directMatch[1];
+  
+  return null;
+}
+
+async function fetchReviews(placeIdOrQuery: string): Promise<string[]> {
+  const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+  if (!apiKey) {
+    throw new Error("GOOGLE_PLACES_API_KEY environment variable is not set");
+  }
+
+  let placeId = placeIdOrQuery;
+
+  // Check if it's a valid place_id format (starts with ChIJ or is a valid place_id)
+  const isValidPlaceId = placeIdOrQuery.startsWith("ChIJ") || 
+                         placeIdOrQuery.match(/^[A-Za-z0-9_-]{27,}$/);
+
+  if (!isValidPlaceId) {
+    // If it's a CID or place name, use text search to find place_id
+    const searchQuery = placeIdOrQuery;
+    const textSearchUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(searchQuery)}&key=${apiKey}`;
+    
+    try {
+      const searchResponse = await fetch(textSearchUrl);
+      const searchData = await searchResponse.json();
+      
+      if (searchData.status === "OK" && searchData.results && searchData.results.length > 0) {
+        placeId = searchData.results[0].place_id;
+      } else {
+        throw new Error(`Could not find place: ${searchData.error_message || searchData.status}`);
+      }
+    } catch (error) {
+      throw new Error(`Failed to search for place: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+
+  // Fetch place details with reviews
+  const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(placeId)}&fields=reviews,rating,user_ratings_total,name&key=${apiKey}`;
+  
+  let response;
+  let data;
+  
+  try {
+    response = await fetch(detailsUrl);
+    data = await response.json();
+  } catch (error) {
+    throw new Error(`Failed to fetch place details: ${error instanceof Error ? error.message : "Unknown error"}`);
+  }
+
+  if (data.status !== "OK") {
+    throw new Error(`Google Places API error: ${data.error_message || data.status}`);
+  }
+
+  if (!data.result) {
+    throw new Error("Place not found");
+  }
+
+  if (!data.result.reviews || data.result.reviews.length === 0) {
+    throw new Error("No reviews found for this place");
+  }
+
+  // Extract review text, limit to 30-50 reviews as specified
+  const reviews = data.result.reviews
+    .slice(0, 50)
+    .map((review: any) => review.text)
+    .filter((text: string) => text && text.trim().length > 0);
+
+  if (reviews.length === 0) {
+    throw new Error("No valid reviews found");
+  }
+
+  return reviews;
+}
+
+function preprocessReviews(reviews: string[]): string[] {
+  return reviews
     .map((review) => review.trim())
     .filter((review) => review.length > 0)
     .filter((review, index, self) => self.indexOf(review) === index); // Remove duplicates
@@ -371,33 +470,22 @@ Output Requirements:
 - Advertisement-ready visual`;
 
   try {
-    // Use Hugging Face Inference API for Qwen/Qwen-Image-2512
-    // If model is not available, fallback to compatible text-to-image model
-    const modelName = "Qwen/Qwen-Image-2512"; // Primary model as specified
-    
-    const response = await fetch(
-      `https://api-inference.huggingface.co/models/${modelName}`,
-      {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${hfApiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          inputs: imagePrompt,
-        }),
-      }
-    );
+    // Use Hugging Face Router API (new endpoint)
+    // Try Stable Diffusion XL as primary model (widely available)
+    const models = [
+      "stabilityai/stable-diffusion-xl-base-1.0",
+      "runwayml/stable-diffusion-v1-5",
+      "stabilityai/stable-diffusion-2-1"
+    ];
 
-    if (!response.ok) {
-      // Try alternative model if primary fails
-      const errorData = await response.json().catch(() => ({}));
-      console.warn("Primary model failed, trying alternative:", errorData);
-      
-      // Try with Stable Diffusion as fallback
-      const altResponse = await fetch(
-        "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0",
-        {
+    let lastError: any = null;
+
+    for (const modelName of models) {
+      try {
+        // Use router API endpoint (new format)
+        const routerUrl = `https://router.huggingface.co/models/${modelName}`;
+        
+        const response = await fetch(routerUrl, {
           method: "POST",
           headers: {
             "Authorization": `Bearer ${hfApiKey}`,
@@ -406,26 +494,62 @@ Output Requirements:
           body: JSON.stringify({
             inputs: imagePrompt,
           }),
+        });
+
+        // Handle model loading (202 status means model is loading)
+        if (response.status === 202) {
+          const loadingData = await response.json().catch(() => ({}));
+          console.warn(`Model ${modelName} is loading, trying next model...`);
+          lastError = "Model is loading";
+          continue;
         }
-      );
 
-      if (!altResponse.ok) {
-        const altError = await altResponse.json().catch(() => ({}));
-        throw new Error(`Hugging Face API error: ${altError.error || altResponse.statusText}`);
+        if (response.ok) {
+          const contentType = response.headers.get("content-type");
+          
+          // Check if response is an image
+          if (contentType && contentType.startsWith("image/")) {
+            const imageBlob = await response.blob();
+            // Convert blob to base64 data URL for display
+            const arrayBuffer = await imageBlob.arrayBuffer();
+            const base64 = Buffer.from(arrayBuffer).toString("base64");
+            return `data:${contentType};base64,${base64}`;
+          } else {
+            // If not an image, might be JSON error
+            const errorText = await response.text();
+            try {
+              const errorData = JSON.parse(errorText);
+              lastError = errorData.error || errorText;
+              // Check if it's a loading message
+              if (errorData.estimated_time) {
+                console.warn(`Model ${modelName} is loading, estimated time: ${errorData.estimated_time}s`);
+                continue;
+              }
+            } catch {
+              lastError = errorText;
+            }
+            continue; // Try next model
+          }
+        } else {
+          const errorText = await response.text();
+          try {
+            const errorData = JSON.parse(errorText);
+            lastError = errorData.error || errorData.message || response.statusText;
+          } catch {
+            lastError = errorText || response.statusText;
+          }
+          console.warn(`Model ${modelName} failed (${response.status}):`, lastError);
+          continue; // Try next model
+        }
+      } catch (modelError) {
+        lastError = modelError instanceof Error ? modelError.message : "Unknown error";
+        console.warn(`Error with model ${modelName}:`, lastError);
+        continue; // Try next model
       }
-
-      const imageBlob = await altResponse.blob();
-      // Convert blob to base64 data URL for display
-      const arrayBuffer = await imageBlob.arrayBuffer();
-      const base64 = Buffer.from(arrayBuffer).toString("base64");
-      return `data:image/png;base64,${base64}`;
     }
 
-    const imageBlob = await response.blob();
-    // Convert blob to base64 data URL for display
-    const arrayBuffer = await imageBlob.arrayBuffer();
-    const base64 = Buffer.from(arrayBuffer).toString("base64");
-    return `data:image/png;base64,${base64}`;
+    // If all models failed, provide helpful error message
+    throw new Error(`Hugging Face API error: All models failed. Last error: ${lastError || "Unknown error"}. Please check your API key and model availability.`);
   } catch (error) {
     console.error("Error generating image:", error);
     throw new Error(`Failed to generate image: ${error instanceof Error ? error.message : "Unknown error"}`);
